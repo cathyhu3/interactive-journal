@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import DayEntryModal from '../components/DayEntryModal'
 import MonthCalendar from '../components/MonthCalendar'
+import MonthAI from '../components/MonthAI'
 import { useGoogleDocs } from '../hooks/useGoogleDocs'
 
 const MONTH_NAMES = [
@@ -21,7 +22,7 @@ export default function MonthPage() {
   const monthName = MONTH_NAMES[idx]
 
   const [editingDay, setEditingDay] = useState(null)
-  const { allEntries, isSignedIn, loading, signIn, signOut, refresh, saveEntry, createEntry, docId, configured } =
+  const { allEntries, lastRefreshed, isSignedIn, loading, signIn, signOut, refresh, saveEntry, createEntry, docId, configured } =
     useGoogleDocs()
 
   const monthEntries = allEntries[idx] || {}
@@ -48,9 +49,11 @@ export default function MonthPage() {
           ) : isSignedIn ? (
             <>
               <span className="gdocs-status">
-                {loading ? 'Loading…' : 'Google Docs connected'}
+                {loading ? 'Syncing…' : lastRefreshed
+                  ? `Synced ${new Date(lastRefreshed).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                  : 'Connected'}
               </span>
-              <button className="gdocs-btn gdocs-btn-refresh" onClick={refresh} disabled={loading} title="Refresh">
+              <button className="gdocs-btn gdocs-btn-refresh" onClick={refresh} disabled={loading} title="Refresh from Google Docs">
                 ↻
               </button>
               <button className="gdocs-btn gdocs-btn-out" onClick={signOut}>Disconnect</button>
@@ -64,12 +67,26 @@ export default function MonthPage() {
       </div>
 
       <section className="calendar-section">
-        <MonthCalendar
-          monthIndex={idx}
-          entries={monthEntries}
-          onDayClick={setEditingDay}
-        />
+        <div className="calendar-outer">
+          <MonthCalendar
+            monthIndex={idx}
+            entries={monthEntries}
+            onDayClick={setEditingDay}
+          />
+          <div className="log-nav-btns">
+            <Link to={`/month/${idx}/log/themes`} className="log-nav-btn">
+              <span className="log-nav-icon">◈</span>
+              Themes Log
+            </Link>
+            <Link to={`/month/${idx}/log/chat`} className="log-nav-btn">
+              <span className="log-nav-icon">◎</span>
+              Chat Log
+            </Link>
+          </div>
+        </div>
       </section>
+
+      <MonthAI monthEntries={monthEntries} monthIndex={idx} />
 
       {editingDay !== null && (
         <DayEntryModal
