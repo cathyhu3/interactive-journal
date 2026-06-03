@@ -28,40 +28,151 @@ a:hover { text-decoration: underline; }
 /* ── Home ── */
 
 .home {
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 48px 24px;
+  padding: 48px 24px 80px;
 }
 
-.home h1 {
+.home-year {
   font-size: 2.4rem;
   font-weight: normal;
   letter-spacing: 0.05em;
-  margin-bottom: 36px;
+  margin-bottom: 48px;
   color: var(--accent);
 }
 
-.month-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+/* ── Season sections ── */
+
+.season-section {
+  padding-bottom: 40px;
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--border);
+}
+.season-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
-.month-card {
+.season-body {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+}
+
+.season-header-row {
+  display: flex;
+  gap: 48px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.season-name {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.season-months-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.season-month-link {
   display: block;
-  padding: 14px 18px;
+  padding: 7px 14px;
   border-radius: 6px;
-  border-left: 4px solid transparent;
-  font-size: 1.05rem;
+  background: var(--accent-light);
+  border-left: 3px solid var(--accent);
+  font-size: 0.97rem;
   color: var(--text);
-  transition: filter 0.1s, transform 0.1s;
+  transition: filter 0.12s, transform 0.12s;
 }
-.month-card:hover { text-decoration: none; filter: brightness(0.95); transform: translateX(2px); }
+.season-month-link:hover {
+  filter: brightness(0.94);
+  transform: translateX(2px);
+  text-decoration: none;
+}
 
-.month-card.winter { background: #eef4fb; border-left-color: #5b9bd5; }
-.month-card.spring { background: #eef7f1; border-left-color: #5bba72; }
-.month-card.summer { background: #fdf8ec; border-left-color: #d4a035; }
-.month-card.fall   { background: #fdf3ee; border-left-color: #d4754a; }
+.season-themes-col {
+  flex: 1;
+}
+
+.season-themes-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.season-themes-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.season-gen-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.season-gen-btn:hover:not(:disabled) { color: var(--accent); }
+.season-gen-btn:disabled { opacity: 0.4; cursor: default; }
+
+.season-themes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  color: var(--text);
+  border: 1px solid transparent;
+  transition: background 0.1s;
+}
+.theme-item:hover {
+  background: var(--hover);
+  border-color: var(--border);
+}
+.theme-empty { color: var(--muted); }
+.theme-empty em { font-style: italic; font-size: 0.85rem; }
+
+.theme-dot {
+  color: var(--accent);
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.theme-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.92rem;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+}
 
 /* ── Month Page ── */
 
@@ -632,5 +743,103 @@ a:hover { text-decoration: underline; }
   background: var(--bg);
   resize: vertical;
   outline: none;
+}
+
+/* ── Sign-in screen ── */
+
+.signin-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.signin-card {
+  text-align: center;
+  padding: 48px 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+}
+
+.signin-year {
+  font-size: 3rem;
+  font-weight: normal;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.signin-sub {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 32px;
+  letter-spacing: 0.04em;
+}
+
+.signin-btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 11px 28px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: opacity 0.15s;
+}
+.signin-btn:hover { opacity: 0.85; }
+
+.signin-loading {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.signin-notice {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.signin-notice code {
+  font-size: 0.82rem;
+  background: var(--hover);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ── Home header with user widget ── */
+
+.home-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 48px;
+}
+
+.home-header .home-year {
+  margin-bottom: 0;
+}
+
+.home-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-user-name {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.header-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
 }
 .log-entry-area:focus { border-color: var(--accent); }

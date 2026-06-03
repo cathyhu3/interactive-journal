@@ -4,6 +4,7 @@ import DayEntryModal from '../components/DayEntryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import MonthAI from '../components/MonthAI'
 import { useGoogleDocs } from '../hooks/useGoogleDocs'
+import { useAuth } from '../context/AuthContext'
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -21,9 +22,10 @@ export default function MonthPage() {
   const idx = parseInt(monthIndex, 10)
   const monthName = MONTH_NAMES[idx]
 
+  const { token, handleAuthExpired, user, signOut } = useAuth()
   const [editingDay, setEditingDay] = useState(null)
-  const { allEntries, lastRefreshed, isSignedIn, loading, signIn, signOut, refresh, saveEntry, createEntry, docId, configured } =
-    useGoogleDocs()
+  const { allEntries, lastRefreshed, loading, refresh, saveEntry, createEntry, docId } =
+    useGoogleDocs(token, handleAuthExpired)
 
   const monthEntries = allEntries[idx] || {}
 
@@ -42,27 +44,18 @@ export default function MonthPage() {
       <div className="month-page-header">
         <h1>{monthName} 2026</h1>
         <div className="gdocs-auth">
-          {!configured ? (
-            <span className="gdocs-notice">
-              Add <code>VITE_GOOGLE_CLIENT_ID</code> to <code>.env.local</code>
-            </span>
-          ) : isSignedIn ? (
-            <>
-              <span className="gdocs-status">
-                {loading ? 'Syncing…' : lastRefreshed
-                  ? `Synced ${new Date(lastRefreshed).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-                  : 'Connected'}
-              </span>
-              <button className="gdocs-btn gdocs-btn-refresh" onClick={refresh} disabled={loading} title="Refresh from Google Docs">
-                ↻
-              </button>
-              <button className="gdocs-btn gdocs-btn-out" onClick={signOut}>Disconnect</button>
-            </>
-          ) : (
-            <button className="gdocs-btn gdocs-btn-in" onClick={signIn} disabled={loading}>
-              {loading ? 'Connecting…' : 'Connect Google Docs'}
-            </button>
+          <span className="gdocs-status">
+            {loading ? 'Syncing…' : lastRefreshed
+              ? `Synced ${new Date(lastRefreshed).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+              : ''}
+          </span>
+          <button className="gdocs-btn gdocs-btn-refresh" onClick={refresh} disabled={loading} title="Refresh from Google Docs">
+            ↻
+          </button>
+          {user?.picture && (
+            <img className="header-avatar" src={user.picture} alt={user.name || ''} title={user.name || ''} />
           )}
+          <button className="gdocs-btn gdocs-btn-out" onClick={signOut}>Sign out</button>
         </div>
       </div>
 
