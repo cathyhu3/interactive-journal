@@ -50,6 +50,8 @@ The day-of-week prefix is optional — `May 27th` or `May 27` also work. When yo
 
 Documents are expected to be in **descending order** (newest entry at the top).
 
+![Example 2026 Journal](journalexample.png)
+
 ## Setup
 
 ### 1. Install dependencies
