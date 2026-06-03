@@ -3,6 +3,13 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback } f
 const SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.readonly'
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 const AUTH_KEY = 'journal-auth-2026'
+const START_YEAR_KEY = 'journal-start-year'
+export const CURRENT_YEAR = new Date().getFullYear()
+
+function loadStartYear() {
+  const v = parseInt(localStorage.getItem(START_YEAR_KEY), 10)
+  return isNaN(v) ? null : v
+}
 
 function waitForGoogle() {
   return new Promise((resolve, reject) => {
@@ -29,8 +36,9 @@ export function AuthProvider({ children }) {
   const stored = loadStored()
   const fresh = isTokenFresh(stored)
 
-  const [token, setToken] = useState(fresh ? stored.token : null)
-  const [user, setUser]   = useState(stored?.email ? { email: stored.email, name: stored.name, picture: stored.picture } : null)
+  const [token, setToken]       = useState(fresh ? stored.token : null)
+  const [user, setUser]         = useState(stored?.email ? { email: stored.email, name: stored.name, picture: stored.picture } : null)
+  const [startYear, setStartYear] = useState(loadStartYear)
   // True while we're attempting a silent re-auth on a previously-signed-in machine
   const [initializing, setInitializing] = useState(!fresh && !!stored?.email)
   const tokenClientRef = useRef(null)
@@ -96,14 +104,24 @@ export function AuthProvider({ children }) {
     tokenClientRef.current?.requestAccessToken({ prompt: 'select_account' })
   }, [])
 
+  const saveStartYear = useCallback((year) => {
+    localStorage.setItem(START_YEAR_KEY, String(year))
+    setStartYear(year)
+  }, [])
+
   const signOut = useCallback(() => {
     const tok = tokenRef.current
     if (tok) window.google?.accounts?.oauth2?.revoke(tok, () => {})
+    // Clear all journal-specific localStorage keys across all years
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('gdoc-cache-') || k.startsWith('season-themes-') || k.startsWith('log-'))
+      .forEach(k => localStorage.removeItem(k))
     localStorage.removeItem(AUTH_KEY)
-    localStorage.removeItem('gdoc-cache-2026')
+    localStorage.removeItem(START_YEAR_KEY)
     tokenRef.current = null
     setToken(null)
     setUser(null)
+    setStartYear(null)
   }, [])
 
   // Called by useGoogleDocs when a 401 is received — try silent refresh
@@ -129,6 +147,9 @@ export function AuthProvider({ children }) {
       signOut,
       handleAuthExpired,
       configured: !!CLIENT_ID,
+      startYear,
+      saveStartYear,
+      currentYear: CURRENT_YEAR,
     }}>
       {children}
     </AuthContext.Provider>

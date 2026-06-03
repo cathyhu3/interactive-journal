@@ -18,14 +18,15 @@ const ORDINALS = [
 ]
 
 export default function MonthPage() {
-  const { monthIndex } = useParams()
+  const { year, monthIndex } = useParams()
+  const yearNum = parseInt(year, 10)
   const idx = parseInt(monthIndex, 10)
   const monthName = MONTH_NAMES[idx]
 
   const { token, handleAuthExpired, user, signOut } = useAuth()
   const [editingDay, setEditingDay] = useState(null)
   const { allEntries, lastRefreshed, loading, refresh, saveEntry, createEntry, docId } =
-    useGoogleDocs(token, handleAuthExpired)
+    useGoogleDocs(token, handleAuthExpired, yearNum)
 
   const monthEntries = allEntries[idx] || {}
 
@@ -40,9 +41,9 @@ export default function MonthPage() {
 
   return (
     <div className="month-page">
-      <Link to="/" className="back-link">← 2026</Link>
+      <Link to={`/year/${year}`} className="back-link">← {yearNum}</Link>
       <div className="month-page-header">
-        <h1>{monthName} 2026</h1>
+        <h1>{monthName} {yearNum}</h1>
         <div className="gdocs-auth">
           <span className="gdocs-status">
             {loading ? 'Syncing…' : lastRefreshed
@@ -67,25 +68,25 @@ export default function MonthPage() {
             onDayClick={setEditingDay}
           />
           <div className="log-nav-btns">
-            <Link to={`/month/${idx}/log/themes`} className="log-nav-btn">
+            <Link to={`/year/${year}/month/${idx}/log/highlights`} className="log-nav-btn">
               <span className="log-nav-icon">◈</span>
-              Themes Log
+              Highlights Log
             </Link>
-            <Link to={`/month/${idx}/log/chat`} className="log-nav-btn">
+            <Link to={`/year/${year}/month/${idx}/log/reflections`} className="log-nav-btn">
               <span className="log-nav-icon">◎</span>
-              Chat Log
+              Reflections Log
             </Link>
           </div>
         </div>
       </section>
 
-      <MonthAI monthEntries={monthEntries} monthIndex={idx} />
+      <MonthAI monthEntries={monthEntries} monthIndex={idx} year={yearNum} />
 
       {editingDay !== null && (
         <DayEntryModal
           day={editingDay}
           ordinal={ORDINALS[editingDay - 1]}
-          monthName={monthName}
+          monthName={`${monthName} ${yearNum}`}
           initialText={monthEntries[editingDay]?.text || ''}
           hasDocEntry={!!monthEntries[editingDay]}
           onSave={handleSave}

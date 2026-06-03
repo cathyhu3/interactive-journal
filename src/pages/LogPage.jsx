@@ -6,17 +6,17 @@ const MONTH_NAMES = [
   'July','August','September','October','November','December',
 ]
 
-export function logKey(monthIndex, logType) {
-  return `log-2026-${monthIndex}-${logType}`
+export function logKey(year, monthIndex, logType) {
+  return `log-${year}-${monthIndex}-${logType}`
 }
 
-export function readLog(monthIndex, logType) {
-  try { return JSON.parse(localStorage.getItem(logKey(monthIndex, logType)) || '[]') }
+export function readLog(year, monthIndex, logType) {
+  try { return JSON.parse(localStorage.getItem(logKey(year, monthIndex, logType)) || '[]') }
   catch { return [] }
 }
 
-export function appendLog(monthIndex, logType, text) {
-  const entries = readLog(monthIndex, logType)
+export function appendLog(year, monthIndex, logType, text) {
+  const entries = readLog(year, monthIndex, logType)
   entries.unshift({
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     timestamp: new Date().toLocaleString('en-US', {
@@ -25,7 +25,7 @@ export function appendLog(monthIndex, logType, text) {
     }),
     text,
   })
-  localStorage.setItem(logKey(monthIndex, logType), JSON.stringify(entries))
+  localStorage.setItem(logKey(year, monthIndex, logType), JSON.stringify(entries))
 }
 
 function LogEntry({ entry, onChange, onDelete }) {
@@ -46,16 +46,16 @@ function LogEntry({ entry, onChange, onDelete }) {
 }
 
 export default function LogPage() {
-  const { monthIndex, logType } = useParams()
+  const { year, monthIndex, logType } = useParams()
   const idx = parseInt(monthIndex, 10)
   const monthName = MONTH_NAMES[idx]
-  const title = logType === 'themes' ? 'Themes Log' : 'Chat Log'
+  const title = logType === 'highlights' ? 'Highlights Log' : 'Reflections Log'
 
-  const [entries, setEntries] = useState(() => readLog(idx, logType))
+  const [entries, setEntries] = useState(() => readLog(year, idx, logType))
 
   const persist = useCallback((next) => {
-    localStorage.setItem(logKey(idx, logType), JSON.stringify(next))
-  }, [idx, logType])
+    localStorage.setItem(logKey(year, idx, logType), JSON.stringify(next))
+  }, [year, idx, logType])
 
   function addBlank() {
     const entry = {
@@ -87,7 +87,7 @@ export default function LogPage() {
 
   return (
     <div className="log-page">
-      <Link to={`/month/${monthIndex}`} className="back-link">← {monthName} 2026</Link>
+      <Link to={`/year/${year}/month/${monthIndex}`} className="back-link">← {monthName} {year}</Link>
       <div className="log-page-header">
         <h1>{monthName} — {title}</h1>
         <button className="log-add-btn" onClick={addBlank}>+ New entry</button>
@@ -95,7 +95,7 @@ export default function LogPage() {
 
       {entries.length === 0 ? (
         <p className="log-empty">
-          No entries yet. Generate {logType === 'themes' ? 'a themes summary' : 'a chat'} from the
+          No entries yet. Generate {logType === 'highlights' ? 'highlights' : 'a reflection'} from the
           calendar page — it will be saved here automatically.
           You can also add a blank entry above to paste notes in.
         </p>

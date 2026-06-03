@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const CACHE_KEY = 'gdoc-cache-2026'
-
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
@@ -10,13 +8,13 @@ const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','
 
 // ── Cache ────────────────────────────────────────────────────────────────────
 
-function loadCache() {
-  try { return JSON.parse(localStorage.getItem(CACHE_KEY)) } catch { return null }
+function loadCache(key) {
+  try { return JSON.parse(localStorage.getItem(key)) } catch { return null }
 }
 
-function saveCache(entries, docId) {
+function saveCache(key, entries, docId) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ entries, docId, lastRefreshed: new Date().toISOString() }))
+    localStorage.setItem(key, JSON.stringify({ entries, docId, lastRefreshed: new Date().toISOString() }))
   } catch { /* quota exceeded */ }
 }
 
@@ -112,8 +110,9 @@ function parseDocument(doc) {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useGoogleDocs(token, onAuthExpired) {
-  const cached = loadCache()
+export function useGoogleDocs(token, onAuthExpired, year) {
+  const cacheKey = `gdoc-cache-${year}`
+  const cached = loadCache(cacheKey)
   const hasCachedEntries = !!(cached?.entries && Object.keys(cached.entries).length > 0)
 
   const [allEntries, setAllEntries]       = useState(cached?.entries ?? {})
@@ -134,7 +133,7 @@ export function useGoogleDocs(token, onAuthExpired) {
     try {
       let id = docIdRef.current
       if (!id) {
-        const q = encodeURIComponent("name='2026' and mimeType='application/vnd.google-apps.document' and trashed=false")
+        const q = encodeURIComponent(`name='${year}' and mimeType='application/vnd.google-apps.document' and trashed=false`)
         const r = await fetch(
           `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
           { headers: { Authorization: `Bearer ${tok}` } }
@@ -159,7 +158,7 @@ export function useGoogleDocs(token, onAuthExpired) {
       setAllEntries(parsed)
       const now = new Date().toISOString()
       setLastRefreshed(now)
-      saveCache(parsed, id)
+      saveCache(cacheKey, parsed, id)
     } catch { /* network errors */ } finally {
       setLoading(false)
     }
@@ -210,6 +209,7 @@ export function useGoogleDocs(token, onAuthExpired) {
     const requests = []
     if (end > start) requests.push({ deleteContentRange: { range: { startIndex: start, endIndex: end } } })
     requests.push({ insertText: { location: { index: start }, text } })
+    requests.push({ updateTextStyle: { range: { startIndex: start, endIndex: start + text.length }, textStyle: { bold: false }, fields: 'bold' } })
     const ok = await batchUpdate(requests)
     if (ok) await fetchDoc(tokenRef.current)
     return ok
@@ -226,17 +226,31 @@ export function useGoogleDocs(token, onAuthExpired) {
       }
     }
     allDates.sort((a, b) => a.monthIndex !== b.monthIndex ? a.monthIndex - b.monthIndex : a.day - b.day)
+    // afterIdx = first entry (ascending sort) with a date strictly after the new entry
     const afterIdx = allDates.findIndex(e => e.monthIndex > monthIndex || (e.monthIndex === monthIndex && e.day > day))
     let insertIndex
-    if (allDates.length === 0) insertIndex = 1
-    else if (afterIdx === -1) insertIndex = allDates[allDates.length - 1].entry.contentEndIndex
-    else if (afterIdx === 0) insertIndex = allDates[0].entry.headingStartIndex
-    else insertIndex = allDates[afterIdx].entry.headingStartIndex
-    const heading = formatDateHeading(2026, monthIndex, day)
-    const content = newText.trim() ? (newText.endsWith('\n') ? newText : newText + '\n') : '\n'
+    // Doc is descending (newest first). In the sorted array, entries with index < afterIdx
+    // have smaller dates and therefore appear later in the doc.
+    if (allDates.length === 0) {
+      insertIndex = 1
+    } else if (afterIdx === -1) {
+      // New entry is the largest date → goes at the very top of the doc
+      insertIndex = allDates[allDates.length - 1].entry.headingStartIndex
+    } else if (afterIdx === 0) {
+      // New entry is smaller than all existing → goes at the very bottom
+      insertIndex = allDates[0].entry.contentEndIndex
+    } else {
+      // Insert just before the entry with the next smaller date (which appears just below in the doc)
+      insertIndex = allDates[afterIdx - 1].entry.headingStartIndex
+    }
+    const heading = formatDateHeading(year, monthIndex, day)
+    const content = (newText.trim() ? (newText.endsWith('\n') ? newText : newText + '\n') : '\n') + '\n'
+    const headingEnd = insertIndex + heading.length
+    const contentStart = headingEnd + 1  // skip the '\n' between heading and body
     const requests = [
       { insertText: { location: { index: insertIndex }, text: heading + '\n' + content } },
-      { updateTextStyle: { range: { startIndex: insertIndex, endIndex: insertIndex + heading.length }, textStyle: { bold: true }, fields: 'bold' } },
+      { updateTextStyle: { range: { startIndex: insertIndex, endIndex: headingEnd }, textStyle: { bold: true }, fields: 'bold' } },
+      { updateTextStyle: { range: { startIndex: contentStart, endIndex: contentStart + content.length }, textStyle: { bold: false }, fields: 'bold' } },
     ]
     const ok = await batchUpdate(requests)
     if (ok) await fetchDoc(tokenRef.current)

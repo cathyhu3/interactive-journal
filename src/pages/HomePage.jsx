@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useClaudeStream } from '../hooks/useClaudeStream'
 import { useAuth } from '../context/AuthContext'
 
@@ -15,20 +15,20 @@ const SEASONS = [
   { name: 'Fall',   id: 3, months: [9, 10, 11] },
 ]
 
-const themesKey = id => `season-themes-2026-${id}`
+const themesKey = (year, id) => `season-themes-${year}-${id}`
 const blank = () => ['', '', '']
 
-function loadThemes(id) {
+function loadThemes(year, id) {
   try {
-    const arr = JSON.parse(localStorage.getItem(themesKey(id)))
+    const arr = JSON.parse(localStorage.getItem(themesKey(year, id)))
     if (!Array.isArray(arr)) return blank()
     while (arr.length < 3) arr.push('')
     return arr.slice(0, 3)
   } catch { return blank() }
 }
 
-function persistThemes(id, themes) {
-  localStorage.setItem(themesKey(id), JSON.stringify(themes))
+function persistThemes(year, id, themes) {
+  localStorage.setItem(themesKey(year, id), JSON.stringify(themes))
 }
 
 function parseAIThemes(text) {
@@ -90,9 +90,9 @@ function EditableTheme({ value, onChange }) {
 
 // ── Season section ───────────────────────────────────────────────────────────
 
-function SeasonSection({ season, allEntries }) {
+function SeasonSection({ season, allEntries, year }) {
   const { stream, streaming } = useClaudeStream()
-  const [themes, setThemes] = useState(() => loadThemes(season.id))
+  const [themes, setThemes] = useState(() => loadThemes(year, season.id))
 
   const hasEntries = season.months.some(mi => {
     const m = allEntries[mi]
@@ -103,7 +103,7 @@ function SeasonSection({ season, allEntries }) {
     setThemes(prev => {
       const next = [...prev]
       next[i] = val
-      persistThemes(season.id, next)
+      persistThemes(year, season.id, next)
       return next
     })
   }
@@ -125,7 +125,7 @@ function SeasonSection({ season, allEntries }) {
         'You extract key themes from personal journal entries. Respond with ONLY a valid JSON array of exactly 3 strings — each a single word or short phrase (2–3 words max). No explanation, no markdown, just the raw JSON array.',
       messages: [{
         role: 'user',
-        content: `Journal entries from ${season.name} 2026:\n\n${parts.join('\n\n')}\n\nReturn the 3 most significant recurring themes as a JSON array of short strings.`,
+        content: `Journal entries from ${season.name} ${year}:\n\n${parts.join('\n\n')}\n\nReturn the 3 most significant recurring themes as a JSON array of short strings.`,
       }],
       maxTokens: 80,
       onDone: (full) => {
@@ -133,7 +133,7 @@ function SeasonSection({ season, allEntries }) {
         if (parsed.length) {
           while (parsed.length < 3) parsed.push('')
           setThemes(parsed)
-          persistThemes(season.id, parsed)
+          persistThemes(year, season.id, parsed)
         }
       },
     })
@@ -162,7 +162,7 @@ function SeasonSection({ season, allEntries }) {
       <div className="season-body">
         <div className="season-months-col">
           {season.months.map(mi => (
-            <Link key={mi} to={`/month/${mi}`} className="season-month-link">
+            <Link key={mi} to={`/year/${year}/month/${mi}`} className="season-month-link">
               {MONTH_NAMES[mi]}
             </Link>
           ))}
@@ -183,17 +183,40 @@ function SeasonSection({ season, allEntries }) {
 // ── Home page ────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const { user, signOut } = useAuth()
+  const { year } = useParams()
+  const yearNum = parseInt(year, 10)
+  const navigate = useNavigate()
+  const { user, signOut, startYear, saveStartYear, currentYear } = useAuth()
+
+  const prevYear = yearNum > startYear ? yearNum - 1 : null
+  const nextYear = yearNum < currentYear ? yearNum + 1 : null
+
+  function handleAddYear() {
+    const newStart = startYear - 1
+    saveStartYear(newStart)
+    navigate(`/year/${newStart}`)
+  }
+
   const [allEntries] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('gdoc-cache-2026'))?.entries ?? {}
+      return JSON.parse(localStorage.getItem(`gdoc-cache-${year}`))?.entries ?? {}
     } catch { return {} }
   })
 
   return (
     <div className="home">
       <div className="home-header">
-        <h1 className="home-year">2026</h1>
+        <div className="year-nav">
+          {prevYear
+            ? <Link to={`/year/${prevYear}`} className="year-nav-btn">‹</Link>
+            : <button className="year-add-btn" onClick={handleAddYear} title="Add an earlier year">+ year</button>
+          }
+          <h1 className="home-year">{yearNum}</h1>
+          {nextYear
+            ? <Link to={`/year/${nextYear}`} className="year-nav-btn">›</Link>
+            : <span className="year-nav-btn year-nav-disabled">›</span>
+          }
+        </div>
         <div className="home-user">
           {user?.picture && (
             <img className="header-avatar" src={user.picture} alt={user.name || ''} title={user.name || ''} />
@@ -203,7 +226,7 @@ export default function HomePage() {
         </div>
       </div>
       {SEASONS.map(season => (
-        <SeasonSection key={season.id} season={season} allEntries={allEntries} />
+        <SeasonSection key={season.id} season={season} allEntries={allEntries} year={yearNum} />
       ))}
     </div>
   )

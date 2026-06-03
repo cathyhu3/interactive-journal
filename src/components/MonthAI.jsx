@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useClaudeStream } from '../hooks/useClaudeStream'
-import { appendLog } from '../pages/LogPage'
+import { appendLog, readLog } from '../pages/LogPage'
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -17,145 +17,120 @@ function formatEntries(monthEntries) {
   }).join('\n\n')
 }
 
-function formatTranscript(messages) {
-  return messages
-    .map(m => `${m.role === 'assistant' ? 'Claude' : 'You'}:\n${m.content}`)
-    .join('\n\n')
+// Pulls the most recent highlights + reflection log entry for each past month
+// within the current year, stopping when the character budget is reached.
+function buildHistoricalContext(year, currentMonthIndex) {
+  const CHAR_BUDGET = 30000
+  const parts = []
+  let used = 0
+
+  for (let mi = 0; mi < 12; mi++) {
+    if (mi === currentMonthIndex) continue
+
+    const hlText  = readLog(year, mi, 'highlights')[0]?.text?.trim()
+    const refText = readLog(year, mi, 'reflections')[0]?.text?.trim()
+    if (!hlText && !refText) continue
+
+    let section = `${MONTH_NAMES[mi]}:\n`
+    if (hlText)  section += `Highlights:\n${hlText}\n`
+    if (refText) section += `Reflection:\n${refText}\n`
+
+    if (used + section.length > CHAR_BUDGET) break
+    parts.push(section)
+    used += section.length
+  }
+
+  return parts.join('\n')
 }
 
-export default function MonthAI({ monthEntries, monthIndex }) {
+export default function MonthAI({ monthEntries, monthIndex, year }) {
   const monthName = MONTH_NAMES[monthIndex]
   const { stream, streaming, abort } = useClaudeStream()
 
-  const [themesOpen, setThemesOpen] = useState(false)
-  const [themesText, setThemesText] = useState('')
-
-  const [chatOpen, setChatOpen] = useState(false)
-  const [messages, setMessages] = useState([])
-  const [pendingText, setPendingText] = useState('')
-  const [chatInput, setChatInput] = useState('')
-
-  const chatEndRef = useRef(null)
-  // Keep a ref so the close handler always sees the latest messages
-  const messagesRef = useRef(messages)
-  useEffect(() => { messagesRef.current = messages }, [messages])
-
-  useEffect(() => {
-    if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, pendingText, chatOpen])
+  const [highlightsOpen, setHighlightsOpen]   = useState(false)
+  const [highlightsText, setHighlightsText]   = useState('')
+  const [reflectionOpen, setReflectionOpen]   = useState(false)
+  const [reflectionText, setReflectionText]   = useState('')
 
   const entriesText = formatEntries(monthEntries)
-  const hasEntries = !!entriesText
+  const hasEntries  = !!entriesText
 
-  // ── Themes ──────────────────────────────────────────────────────────────
+  // ── Highlights ──────────────────────────────────────────────────────────
 
-  function toggleThemes() {
-    if (themesOpen) {
+  function toggleHighlights() {
+    if (highlightsOpen) {
       abort()
-      setThemesOpen(false)
-      setThemesText('')
+      setHighlightsOpen(false)
+      setHighlightsText('')
       return
     }
-    setThemesOpen(true)
-    setThemesText('')
+    setHighlightsOpen(true)
+    setHighlightsText('')
     stream({
       system:
-        'You are a thoughtful reader of personal journals. Identify key recurring themes, emotional patterns, and meaningful threads across the entries. Be specific and warm. Write in flowing paragraphs — no bullet points.',
+        'You extract specific, concrete highlights from personal journal entries. ' +
+        'Look for memorable activities, things learned, meaningful experiences, personal growth moments, ' +
+        'interesting observations, and life reflections. ' +
+        'Format as a bullet list (using "•") with vivid, specific phrases drawn directly from the entries. ' +
+        'Avoid generic statements — every bullet should feel personal and particular.',
       messages: [{
         role: 'user',
-        content: `Here are my journal entries for ${monthName} 2026:\n\n${entriesText}\n\nSummarize the themes and reflections of this month.`,
+        content:
+          `Here are my journal entries for ${monthName} ${year}:\n\n${entriesText}\n\n` +
+          `List the highlights of this month — memorable moments, activities, things I learned, ` +
+          `and personal reflections. Be specific and draw directly from what I wrote.`,
       }],
-      maxTokens: 1200,
-      onChunk: (full) => setThemesText(full),
-      onDone: (full) => {
-        setThemesText(full)
-        appendLog(monthIndex, 'themes', full)
-      },
-      onError: (err) => setThemesText(`Error: ${err}`),
+      maxTokens: 1500,
+      onChunk: (full) => setHighlightsText(full),
+      onDone:  (full) => { setHighlightsText(full); appendLog(year, monthIndex, 'highlights', full) },
+      onError: (err)  => setHighlightsText(`Error: ${err}`),
     })
   }
 
-  // ── Chat ────────────────────────────────────────────────────────────────
+  // ── Reflection ──────────────────────────────────────────────────────────
 
-  const CHAT_SYSTEM =
-    'You are a warm, curious conversation partner helping someone reflect on their personal journal. Stay grounded in what they actually wrote. Be specific, not generic. Keep responses focused and conversational.'
-
-  function buildApiMessages(visibleMessages) {
-    return [
-      {
-        role: 'user',
-        content:
-          `Here are my journal entries for ${monthName} 2026:\n\n${entriesText}\n\n` +
-          `Pick ONE specific topic, moment, or insight from my entries that you find interesting. ` +
-          `Share your thoughts on it and invite me to keep talking.`,
-      },
-      ...visibleMessages,
-    ]
-  }
-
-  function saveChat(msgs) {
-    if (!msgs.length) return
-    appendLog(monthIndex, 'chat', formatTranscript(msgs))
-  }
-
-  function toggleChat() {
-    if (chatOpen) {
+  function toggleReflection() {
+    if (reflectionOpen) {
       abort()
-      saveChat(messagesRef.current)
-      setChatOpen(false)
-      setMessages([])
-      setPendingText('')
-      setChatInput('')
+      setReflectionOpen(false)
+      setReflectionText('')
       return
     }
-    setChatOpen(true)
-    setMessages([])
-    setPendingText('')
-    stream({
-      system: CHAT_SYSTEM,
-      messages: buildApiMessages([]),
-      maxTokens: 600,
-      onChunk: (full) => setPendingText(full),
-      onDone: (full) => {
-        setPendingText('')
-        setMessages([{ role: 'assistant', content: full }])
-      },
-      onError: (err) => {
-        setPendingText('')
-        setMessages([{ role: 'assistant', content: `Error: ${err}` }])
-      },
-    })
-  }
+    setReflectionOpen(true)
+    setReflectionText('')
 
-  function sendMessage() {
-    if (!chatInput.trim() || streaming) return
-    const userMsg = { role: 'user', content: chatInput.trim() }
-    const next = [...messages, userMsg]
-    setMessages(next)
-    setChatInput('')
-    setPendingText('')
+    const historical = buildHistoricalContext(year, monthIndex)
+
+    // Cap current-month entries so they never crowd out everything else
+    const MAX_ENTRY_CHARS = 20000
+    const entries = entriesText && entriesText.length > MAX_ENTRY_CHARS
+      ? entriesText.slice(0, MAX_ENTRY_CHARS) + '\n[truncated for length]'
+      : entriesText
+
+    const historicalSection = historical
+      ? `Context from previous months' highlights and reflections:\n\n${historical}\n---\n\n`
+      : ''
 
     stream({
-      system: CHAT_SYSTEM,
-      messages: buildApiMessages(next),
-      maxTokens: 600,
-      onChunk: (full) => setPendingText(full),
-      onDone: (full) => {
-        setPendingText('')
-        setMessages(prev => [...prev, { role: 'assistant', content: full }])
-      },
-      onError: (err) => {
-        setPendingText('')
-        setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err}` }])
-      },
+      system:
+        'You are a thoughtful journaling companion who has been following someone\'s journal over time. ' +
+        'Write a warm, personal, specific reflection on their current month. ' +
+        'Draw on concrete details from this month\'s entries, and where the historical context is available, ' +
+        'notice patterns, growth, and connections across time. Write in flowing prose.',
+      messages: [{
+        role: 'user',
+        content:
+          `${historicalSection}` +
+          `My journal entries for ${monthName} ${year}:\n\n${entries}\n\n` +
+          `Write a thoughtful reflection on this month. ` +
+          `Reference specific things I wrote about, and if past context is available, ` +
+          `connect this month to the broader arc of the year.`,
+      }],
+      maxTokens: 2000,
+      onChunk: (full) => setReflectionText(full),
+      onDone:  (full) => { setReflectionText(full); appendLog(year, monthIndex, 'reflections', full) },
+      onError: (err)  => setReflectionText(`Error: ${err}`),
     })
-  }
-
-  function handleInputKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -164,71 +139,41 @@ export default function MonthAI({ monthEntries, monthIndex }) {
     <div className="month-ai">
       <div className="ai-btn-row">
         <button
-          className={`ai-btn ${themesOpen ? 'ai-btn-on' : ''}`}
-          onClick={toggleThemes}
+          className={`ai-btn ${highlightsOpen ? 'ai-btn-on' : ''}`}
+          onClick={toggleHighlights}
           disabled={!hasEntries}
           title={!hasEntries ? 'No journal entries loaded' : undefined}
         >
-          {themesOpen ? 'Clear themes' : 'Themes'}
+          {highlightsOpen ? 'Clear highlights' : 'Highlights'}
         </button>
         <button
-          className={`ai-btn ${chatOpen ? 'ai-btn-on' : ''}`}
-          onClick={toggleChat}
+          className={`ai-btn ${reflectionOpen ? 'ai-btn-on' : ''}`}
+          onClick={toggleReflection}
           disabled={!hasEntries}
           title={!hasEntries ? 'No journal entries loaded' : undefined}
         >
-          {chatOpen ? 'Close chat' : 'Chat about this month'}
+          {reflectionOpen ? 'Clear reflection' : 'Reflect'}
         </button>
         {!hasEntries && (
           <span className="ai-empty-note">Connect Google Docs to enable AI features</span>
         )}
       </div>
 
-      {themesOpen && (
+      {highlightsOpen && (
         <div className="ai-themes">
-          {!themesText
-            ? <span className="ai-loading">Reflecting on your entries…</span>
-            : <div className="ai-themes-body">{themesText}</div>
+          {!highlightsText
+            ? <span className="ai-loading">Finding highlights…</span>
+            : <div className="ai-themes-body">{highlightsText}</div>
           }
         </div>
       )}
 
-      {chatOpen && (
-        <div className="ai-chat">
-          <div className="ai-chat-log">
-            {messages.map((msg, i) => (
-              <div key={i} className={`ai-bubble ai-bubble-${msg.role}`}>
-                {msg.content}
-              </div>
-            ))}
-            {pendingText && (
-              <div className="ai-bubble ai-bubble-assistant">
-                {pendingText}<span className="ai-cursor">▋</span>
-              </div>
-            )}
-            {streaming && !pendingText && messages.length === 0 && (
-              <span className="ai-loading">Starting conversation…</span>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-          <div className="ai-chat-footer">
-            <textarea
-              className="ai-chat-input"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={handleInputKey}
-              placeholder="Reply… (Enter to send, Shift+Enter for newline)"
-              rows={2}
-              disabled={streaming}
-            />
-            <button
-              className="ai-send-btn"
-              onClick={sendMessage}
-              disabled={streaming || !chatInput.trim()}
-            >
-              Send
-            </button>
-          </div>
+      {reflectionOpen && (
+        <div className="ai-themes">
+          {!reflectionText
+            ? <span className="ai-loading">Gathering your journal history…</span>
+            : <div className="ai-themes-body">{reflectionText}</div>
+          }
         </div>
       )}
     </div>
