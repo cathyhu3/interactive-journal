@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { useAuth, CURRENT_YEAR } from './context/AuthContext'
 import HomePage from './pages/HomePage'
 import MonthPage from './pages/MonthPage'
@@ -35,10 +35,6 @@ function YearPickerScreen() {
   const years = []
   for (let y = CURRENT_YEAR; y >= 2000; y--) years.push(y)
 
-  function confirm() {
-    saveStartYear(selected)
-  }
-
   return (
     <div className="signin-page">
       <div className="signin-card">
@@ -51,36 +47,38 @@ function YearPickerScreen() {
         >
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <button className="signin-btn year-picker-btn" onClick={confirm}>
+        <button className="signin-btn year-picker-btn" onClick={() => saveStartYear(selected)}>
           Continue
         </button>
-        <p className="year-picker-hint">
-          You can flip between years on the home page.
-        </p>
+        <p className="year-picker-hint">You can flip between years on the home page.</p>
       </div>
     </div>
   )
 }
 
-// Forces a full remount when the year URL segment changes so that all
-// useState initialisations re-run with fresh localStorage data.
-function YearKeyed({ Page }) {
-  const { year } = useParams()
-  return <Page key={year} />
+// Forces remount when journal type or year changes so useState re-initialises
+// from the correct localStorage keys.
+function RouteKeyed({ Page }) {
+  const { journalType, year } = useParams()
+  return <Page key={`${journalType}-${year}`} />
 }
 
 export default function App() {
-  const { isSignedIn, initializing, startYear } = useAuth()
+  const { isSignedIn, startYear } = useAuth()
+  const location = useLocation()
+  const journalType = location.pathname.startsWith('/career') ? 'career' : 'life'
 
   if (!isSignedIn) return <SignInScreen />
-  if (!startYear) return <YearPickerScreen />
+  if (!startYear)  return <YearPickerScreen />
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to={`/year/${CURRENT_YEAR}`} replace />} />
-      <Route path="/year/:year" element={<YearKeyed Page={HomePage} />} />
-      <Route path="/year/:year/month/:monthIndex" element={<YearKeyed Page={MonthPage} />} />
-      <Route path="/year/:year/month/:monthIndex/log/:logType" element={<YearKeyed Page={LogPage} />} />
-    </Routes>
+    <div data-journal={journalType}>
+      <Routes>
+        <Route path="/" element={<Navigate to={`/life/year/${CURRENT_YEAR}`} replace />} />
+        <Route path="/:journalType/year/:year" element={<RouteKeyed Page={HomePage} />} />
+        <Route path="/:journalType/year/:year/month/:monthIndex" element={<RouteKeyed Page={MonthPage} />} />
+        <Route path="/:journalType/year/:year/month/:monthIndex/log/:logType" element={<RouteKeyed Page={LogPage} />} />
+      </Routes>
+    </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useClaudeStream } from '../hooks/useClaudeStream'
 import { useAuth } from '../context/AuthContext'
+import JournalToggle from '../components/JournalToggle'
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -15,20 +16,20 @@ const SEASONS = [
   { name: 'Fall',   id: 3, months: [9, 10, 11] },
 ]
 
-const themesKey = (year, id) => `season-themes-${year}-${id}`
+const themesKey = (journalType, year, id) => `season-themes-${journalType}-${year}-${id}`
 const blank = () => ['', '', '']
 
-function loadThemes(year, id) {
+function loadThemes(journalType, year, id) {
   try {
-    const arr = JSON.parse(localStorage.getItem(themesKey(year, id)))
+    const arr = JSON.parse(localStorage.getItem(themesKey(journalType, year, id)))
     if (!Array.isArray(arr)) return blank()
     while (arr.length < 3) arr.push('')
     return arr.slice(0, 3)
   } catch { return blank() }
 }
 
-function persistThemes(year, id, themes) {
-  localStorage.setItem(themesKey(year, id), JSON.stringify(themes))
+function persistThemes(journalType, year, id, themes) {
+  localStorage.setItem(themesKey(journalType, year, id), JSON.stringify(themes))
 }
 
 function parseAIThemes(text) {
@@ -90,9 +91,23 @@ function EditableTheme({ value, onChange }) {
 
 // ── Season section ───────────────────────────────────────────────────────────
 
-function SeasonSection({ season, allEntries, year }) {
+const SEASON_PROMPTS = {
+  life: {
+    system: 'You extract key themes from personal journal entries. Respond with ONLY a valid JSON array of exactly 3 strings — each a single word or short phrase (2–3 words max). No explanation, no markdown, just the raw JSON array.',
+    user: (seasonName, year, parts) =>
+      `Journal entries from ${seasonName} ${year}:\n\n${parts}\n\nReturn the 3 most significant recurring themes as a JSON array of short strings.`,
+  },
+  career: {
+    system: 'You extract key professional themes from career journal entries. Respond with ONLY a valid JSON array of exactly 3 strings — each a skill, focus area, or short phrase (2–3 words max). No explanation, no markdown, just the raw JSON array.',
+    user: (seasonName, year, parts) =>
+      `Career journal entries from ${seasonName} ${year}:\n\n${parts}\n\nReturn the 3 most significant recurring professional themes or skills as a JSON array of short strings.`,
+  },
+}
+
+function SeasonSection({ season, allEntries, year, journalType }) {
   const { stream, streaming } = useClaudeStream()
-  const [themes, setThemes] = useState(() => loadThemes(year, season.id))
+  const [themes, setThemes] = useState(() => loadThemes(journalType, year, season.id))
+  const prompts = SEASON_PROMPTS[journalType] ?? SEASON_PROMPTS.life
 
   const hasEntries = season.months.some(mi => {
     const m = allEntries[mi]
@@ -103,7 +118,7 @@ function SeasonSection({ season, allEntries, year }) {
     setThemes(prev => {
       const next = [...prev]
       next[i] = val
-      persistThemes(year, season.id, next)
+      persistThemes(journalType, year, season.id, next)
       return next
     })
   }
@@ -121,19 +136,15 @@ function SeasonSection({ season, allEntries, year }) {
     if (!parts.length) return
 
     stream({
-      system:
-        'You extract key themes from personal journal entries. Respond with ONLY a valid JSON array of exactly 3 strings — each a single word or short phrase (2–3 words max). No explanation, no markdown, just the raw JSON array.',
-      messages: [{
-        role: 'user',
-        content: `Journal entries from ${season.name} ${year}:\n\n${parts.join('\n\n')}\n\nReturn the 3 most significant recurring themes as a JSON array of short strings.`,
-      }],
+      system: prompts.system,
+      messages: [{ role: 'user', content: prompts.user(season.name, year, parts.join('\n\n')) }],
       maxTokens: 80,
       onDone: (full) => {
         const parsed = parseAIThemes(full)
         if (parsed.length) {
           while (parsed.length < 3) parsed.push('')
           setThemes(parsed)
-          persistThemes(year, season.id, parsed)
+          persistThemes(journalType, year, season.id, parsed)
         }
       },
     })
@@ -141,7 +152,6 @@ function SeasonSection({ season, allEntries, year }) {
 
   return (
     <div className="season-section">
-
       <div className="season-header-row">
         <p className="season-name">{season.name}</p>
         <div className="season-themes-header">
@@ -162,7 +172,7 @@ function SeasonSection({ season, allEntries, year }) {
       <div className="season-body">
         <div className="season-months-col">
           {season.months.map(mi => (
-            <Link key={mi} to={`/year/${year}/month/${mi}`} className="season-month-link">
+            <Link key={mi} to={`/${journalType}/year/${year}/month/${mi}`} className="season-month-link">
               {MONTH_NAMES[mi]}
             </Link>
           ))}
@@ -175,7 +185,6 @@ function SeasonSection({ season, allEntries, year }) {
           </div>
         </div>
       </div>
-
     </div>
   )
 }
@@ -183,7 +192,7 @@ function SeasonSection({ season, allEntries, year }) {
 // ── Home page ────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const { year } = useParams()
+  const { journalType, year } = useParams()
   const yearNum = parseInt(year, 10)
   const navigate = useNavigate()
   const { user, signOut, startYear, saveStartYear, currentYear } = useAuth()
@@ -194,12 +203,12 @@ export default function HomePage() {
   function handleAddYear() {
     const newStart = startYear - 1
     saveStartYear(newStart)
-    navigate(`/year/${newStart}`)
+    navigate(`/${journalType}/year/${newStart}`)
   }
 
   const [allEntries] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem(`gdoc-cache-${year}`))?.entries ?? {}
+      return JSON.parse(localStorage.getItem(`gdoc-cache-${journalType}-${year}`))?.entries ?? {}
     } catch { return {} }
   })
 
@@ -208,16 +217,17 @@ export default function HomePage() {
       <div className="home-header">
         <div className="year-nav">
           {prevYear
-            ? <Link to={`/year/${prevYear}`} className="year-nav-btn">‹</Link>
+            ? <Link to={`/${journalType}/year/${prevYear}`} className="year-nav-btn">‹</Link>
             : <button className="year-add-btn" onClick={handleAddYear} title="Add an earlier year">+ year</button>
           }
           <h1 className="home-year">{yearNum}</h1>
           {nextYear
-            ? <Link to={`/year/${nextYear}`} className="year-nav-btn">›</Link>
+            ? <Link to={`/${journalType}/year/${nextYear}`} className="year-nav-btn">›</Link>
             : <span className="year-nav-btn year-nav-disabled">›</span>
           }
         </div>
         <div className="home-user">
+          <JournalToggle />
           {user?.picture && (
             <img className="header-avatar" src={user.picture} alt={user.name || ''} title={user.name || ''} />
           )}
@@ -226,7 +236,13 @@ export default function HomePage() {
         </div>
       </div>
       {SEASONS.map(season => (
-        <SeasonSection key={season.id} season={season} allEntries={allEntries} year={yearNum} />
+        <SeasonSection
+          key={season.id}
+          season={season}
+          allEntries={allEntries}
+          year={yearNum}
+          journalType={journalType}
+        />
       ))}
     </div>
   )

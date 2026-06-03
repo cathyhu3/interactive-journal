@@ -6,17 +6,17 @@ const MONTH_NAMES = [
   'July','August','September','October','November','December',
 ]
 
-export function logKey(year, monthIndex, logType) {
-  return `log-${year}-${monthIndex}-${logType}`
+export function logKey(journalType, year, monthIndex, logType) {
+  return `log-${journalType}-${year}-${monthIndex}-${logType}`
 }
 
-export function readLog(year, monthIndex, logType) {
-  try { return JSON.parse(localStorage.getItem(logKey(year, monthIndex, logType)) || '[]') }
+export function readLog(journalType, year, monthIndex, logType) {
+  try { return JSON.parse(localStorage.getItem(logKey(journalType, year, monthIndex, logType)) || '[]') }
   catch { return [] }
 }
 
-export function appendLog(year, monthIndex, logType, text) {
-  const entries = readLog(year, monthIndex, logType)
+export function appendLog(journalType, year, monthIndex, logType, text) {
+  const entries = readLog(journalType, year, monthIndex, logType)
   entries.unshift({
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     timestamp: new Date().toLocaleString('en-US', {
@@ -25,7 +25,7 @@ export function appendLog(year, monthIndex, logType, text) {
     }),
     text,
   })
-  localStorage.setItem(logKey(year, monthIndex, logType), JSON.stringify(entries))
+  localStorage.setItem(logKey(journalType, year, monthIndex, logType), JSON.stringify(entries))
 }
 
 function LogEntry({ entry, onChange, onDelete }) {
@@ -46,16 +46,16 @@ function LogEntry({ entry, onChange, onDelete }) {
 }
 
 export default function LogPage() {
-  const { year, monthIndex, logType } = useParams()
+  const { journalType, year, monthIndex, logType } = useParams()
   const idx = parseInt(monthIndex, 10)
   const monthName = MONTH_NAMES[idx]
   const title = logType === 'highlights' ? 'Highlights Log' : 'Reflections Log'
 
-  const [entries, setEntries] = useState(() => readLog(year, idx, logType))
+  const [entries, setEntries] = useState(() => readLog(journalType, year, idx, logType))
 
   const persist = useCallback((next) => {
-    localStorage.setItem(logKey(year, idx, logType), JSON.stringify(next))
-  }, [year, idx, logType])
+    localStorage.setItem(logKey(journalType, year, idx, logType), JSON.stringify(next))
+  }, [journalType, year, idx, logType])
 
   function addBlank() {
     const entry = {
@@ -87,7 +87,7 @@ export default function LogPage() {
 
   return (
     <div className="log-page">
-      <Link to={`/year/${year}/month/${monthIndex}`} className="back-link">← {monthName} {year}</Link>
+      <Link to={`/${journalType}/year/${year}/month/${monthIndex}`} className="back-link">← {monthName} {year}</Link>
       <div className="log-page-header">
         <h1>{monthName} — {title}</h1>
         <button className="log-add-btn" onClick={addBlank}>+ New entry</button>

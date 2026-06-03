@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import DayEntryModal from '../components/DayEntryModal'
 import MonthCalendar from '../components/MonthCalendar'
 import MonthAI from '../components/MonthAI'
+import JournalToggle from '../components/JournalToggle'
 import { useGoogleDocs } from '../hooks/useGoogleDocs'
 import { useAuth } from '../context/AuthContext'
 
@@ -18,7 +19,7 @@ const ORDINALS = [
 ]
 
 export default function MonthPage() {
-  const { year, monthIndex } = useParams()
+  const { journalType, year, monthIndex } = useParams()
   const yearNum = parseInt(year, 10)
   const idx = parseInt(monthIndex, 10)
   const monthName = MONTH_NAMES[idx]
@@ -26,7 +27,7 @@ export default function MonthPage() {
   const { token, handleAuthExpired, user, signOut } = useAuth()
   const [editingDay, setEditingDay] = useState(null)
   const { allEntries, lastRefreshed, loading, refresh, saveEntry, createEntry, docId } =
-    useGoogleDocs(token, handleAuthExpired, yearNum)
+    useGoogleDocs(token, handleAuthExpired, yearNum, journalType)
 
   const monthEntries = allEntries[idx] || {}
 
@@ -41,7 +42,7 @@ export default function MonthPage() {
 
   return (
     <div className="month-page">
-      <Link to={`/year/${year}`} className="back-link">← {yearNum}</Link>
+      <Link to={`/${journalType}/year/${year}`} className="back-link">← {yearNum}</Link>
       <div className="month-page-header">
         <h1>{monthName} {yearNum}</h1>
         <div className="gdocs-auth">
@@ -53,6 +54,7 @@ export default function MonthPage() {
           <button className="gdocs-btn gdocs-btn-refresh" onClick={refresh} disabled={loading} title="Refresh from Google Docs">
             ↻
           </button>
+          <JournalToggle />
           {user?.picture && (
             <img className="header-avatar" src={user.picture} alt={user.name || ''} title={user.name || ''} />
           )}
@@ -68,11 +70,11 @@ export default function MonthPage() {
             onDayClick={setEditingDay}
           />
           <div className="log-nav-btns">
-            <Link to={`/year/${year}/month/${idx}/log/highlights`} className="log-nav-btn">
+            <Link to={`/${journalType}/year/${year}/month/${idx}/log/highlights`} className="log-nav-btn">
               <span className="log-nav-icon">◈</span>
               Highlights Log
             </Link>
-            <Link to={`/year/${year}/month/${idx}/log/reflections`} className="log-nav-btn">
+            <Link to={`/${journalType}/year/${year}/month/${idx}/log/reflections`} className="log-nav-btn">
               <span className="log-nav-icon">◎</span>
               Reflections Log
             </Link>
@@ -80,7 +82,7 @@ export default function MonthPage() {
         </div>
       </section>
 
-      <MonthAI monthEntries={monthEntries} monthIndex={idx} year={yearNum} />
+      <MonthAI monthEntries={monthEntries} monthIndex={idx} year={yearNum} journalType={journalType} />
 
       {editingDay !== null && (
         <DayEntryModal

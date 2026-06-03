@@ -110,8 +110,8 @@ function parseDocument(doc) {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useGoogleDocs(token, onAuthExpired, year) {
-  const cacheKey = `gdoc-cache-${year}`
+export function useGoogleDocs(token, onAuthExpired, year, journalType) {
+  const cacheKey = `gdoc-cache-${journalType}-${year}`
   const cached = loadCache(cacheKey)
   const hasCachedEntries = !!(cached?.entries && Object.keys(cached.entries).length > 0)
 
@@ -133,7 +133,8 @@ export function useGoogleDocs(token, onAuthExpired, year) {
     try {
       let id = docIdRef.current
       if (!id) {
-        const q = encodeURIComponent(`name='${year}' and mimeType='application/vnd.google-apps.document' and trashed=false`)
+        const docName = journalType === 'career' ? `${year} career` : String(year)
+        const q = encodeURIComponent(`name='${docName}' and mimeType='application/vnd.google-apps.document' and trashed=false`)
         const r = await fetch(
           `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
           { headers: { Authorization: `Bearer ${tok}` } }

@@ -895,6 +895,41 @@ a:hover { text-decoration: underline; }
   pointer-events: none;
 }
 
+/* ── Career journal colour scheme ── */
+
+[data-journal="career"] {
+  --accent: #1e5a9c;
+  --accent-light: #ddeaf7;
+}
+
+/* ── Journal toggle (Life / Career) ── */
+
+.journal-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.jtog-opt {
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  transition: background 0.12s, color 0.12s;
+}
+.jtog-opt:hover { background: var(--hover); color: var(--text); }
+
+.jtog-active.jtog-life   { background: #3a6b4a; color: #fff; }
+.jtog-active.jtog-career { background: #1e5a9c; color: #fff; }
+.jtog-active:hover { opacity: 0.9; }
+
+/* ── Year add button ── */
+
 .year-add-btn {
   font-family: inherit;
   font-size: 0.75rem;
